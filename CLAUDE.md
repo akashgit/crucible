@@ -8,7 +8,8 @@ Crucible is a Claude Code plugin that provides adversarial verification. It spaw
 
 ```
 crucible/
-├── plugin.json                     # Plugin manifest
+├── .claude-plugin/
+│   └── plugin.json                 # Plugin manifest (required for plugin detection)
 ├── hooks/
 │   └── hooks.json                  # Lifecycle hook definitions
 ├── agents/
@@ -17,7 +18,10 @@ crucible/
 │   └── crucible-verify/
 │       └── SKILL.md                # Manual /crucible-verify trigger
 ├── scripts/
+│   ├── capture-task.sh             # Task capture for UserPromptSubmit hook
 │   └── parse-diff.sh               # Diff parser for feeding adversary
+├── bin/
+│   └── crucible                    # Standalone CLI wrapper
 ├── eval/
 │   └── score.py                    # 5-dimension eval harness
 ├── tests/
@@ -27,11 +31,24 @@ crucible/
 └── CLAUDE.md                       # This file
 ```
 
+## Installation
+
+```bash
+claude plugin install /path/to/crucible
+```
+
 ## Design: Two-Phase Adversary
 
 1. **Phase 1 (Planning)** — runs concurrently with the primary agent. Reads the user's original task, builds a verification plan BEFORE seeing any code. Writes plan to `.crucible/verification-plan.md`.
 
 2. **Phase 2 (Execution)** — runs after primary signals done. Reads the diff, executes the pre-built verification plan, runs what was built, classifies findings by severity, argues back with evidence.
+
+## Hook Mechanics
+
+- **UserPromptSubmit**: command hook runs `capture-task.sh` (sync) to save the task, then agent hook spawns adversary Phase 1 (async).
+- **Stop**: command hook runs `parse-diff.sh` (sync) to capture the diff, then agent hook spawns adversary Phase 2 (asyncRewake — re-wakes session with findings).
+
+All hook commands use exec form (`command` + `args`) with `${CLAUDE_PLUGIN_ROOT}` for paths.
 
 ## Zero Dependencies
 

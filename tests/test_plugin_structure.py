@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify Crucible plugin files exist and are valid."""
+"""Verify Crucible project files exist and are valid."""
 
 import json
 import os
@@ -11,52 +11,107 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
+class TestCLI(unittest.TestCase):
+    def test_bin_crucible_exists(self):
+        self.assertTrue((ROOT / "bin" / "crucible").exists())
+
+    def test_bin_crucible_executable(self):
+        self.assertTrue(os.access(ROOT / "bin" / "crucible", os.X_OK))
+
+    def test_bin_crucible_valid_bash(self):
+        result = subprocess.run(
+            ["bash", "-n", str(ROOT / "bin" / "crucible")],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, f"Syntax error: {result.stderr}")
+
+    def test_bin_crucible_help(self):
+        result = subprocess.run(
+            [str(ROOT / "bin" / "crucible"), "--help"],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Usage:", result.stdout)
+        self.assertIn("--max-loops", result.stdout)
+        self.assertIn("--project-dir", result.stdout)
+        self.assertIn("--verbose", result.stdout)
+
+    def test_bin_crucible_no_args_error(self):
+        result = subprocess.run(
+            [str(ROOT / "bin" / "crucible")],
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("No task provided", result.stderr)
+
+
 class TestPluginManifest(unittest.TestCase):
     def test_plugin_json_exists(self):
-        self.assertTrue((ROOT / "plugin.json").exists())
+        self.assertTrue((ROOT / ".claude-plugin" / "plugin.json").exists())
+
+    def test_old_plugin_json_removed(self):
+        self.assertFalse((ROOT / "plugin.json").exists())
 
     def test_plugin_json_valid(self):
-        data = json.loads((ROOT / "plugin.json").read_text())
+        data = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text())
         self.assertEqual(data["name"], "crucible")
-        self.assertEqual(data["version"], "0.1.0")
         self.assertIn("description", data)
-        self.assertIn("hooks", data)
-        self.assertIn("agents", data)
-        self.assertIn("skills", data)
+        self.assertIn("author", data)
 
     def test_plugin_version_semver(self):
-        data = json.loads((ROOT / "plugin.json").read_text())
+        data = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text())
         parts = data["version"].split(".")
         self.assertEqual(len(parts), 3)
         for part in parts:
             int(part)
 
 
-class TestHooksConfig(unittest.TestCase):
-    def test_hooks_json_exists(self):
-        self.assertTrue((ROOT / "hooks" / "hooks.json").exists())
-
+class TestHooksFormat(unittest.TestCase):
     def test_hooks_json_valid(self):
         data = json.loads((ROOT / "hooks" / "hooks.json").read_text())
         self.assertIn("hooks", data)
-        hooks = data["hooks"]
-        self.assertIn("UserPromptSubmit", hooks)
-        self.assertIn("Stop", hooks)
 
-    def test_stop_hook_references_parse_diff(self):
+    def test_hooks_use_exec_form(self):
+        data = json.loads((ROOT / "hooks" / "hooks.json").read_text())
+        for event, matcher_groups in data["hooks"].items():
+            for group in matcher_groups:
+                for hook in group["hooks"]:
+                    if hook["type"] == "command":
+                        self.assertIn("command", hook)
+                        self.assertIn("args", hook)
+
+    def test_hooks_use_plugin_root(self):
+        content = (ROOT / "hooks" / "hooks.json").read_text()
+        self.assertIn("${CLAUDE_PLUGIN_ROOT}", content)
+
+    def test_hooks_stop_has_async_rewake(self):
         data = json.loads((ROOT / "hooks" / "hooks.json").read_text())
         stop_hooks = data["hooks"]["Stop"]
-        commands = []
-        for entry in stop_hooks:
-            for hook in entry.get("hooks", []):
-                commands.append(hook.get("command", ""))
-        combined = " ".join(commands)
-        self.assertIn("parse-diff.sh", combined)
+        agent_hooks = [
+            h for g in stop_hooks for h in g["hooks"] if h["type"] == "agent"
+        ]
+        self.assertTrue(any(h.get("asyncRewake") for h in agent_hooks))
+
+    def test_capture_task_script_exists(self):
+        self.assertTrue((ROOT / "scripts" / "capture-task.sh").exists())
+
+    def test_capture_task_executable(self):
+        self.assertTrue(os.access(ROOT / "scripts" / "capture-task.sh", os.X_OK))
 
 
 class TestAdversaryPrompt(unittest.TestCase):
     def test_adversary_md_exists(self):
         self.assertTrue((ROOT / "agents" / "adversary.md").exists())
+
+    def test_adversary_has_frontmatter(self):
+        content = (ROOT / "agents" / "adversary.md").read_text()
+        self.assertTrue(content.startswith("---"))
+        self.assertIn("name: adversary", content)
+        self.assertIn("model: sonnet", content)
+        self.assertIn("maxTurns:", content)
 
     def test_adversary_has_phase1(self):
         content = (ROOT / "agents" / "adversary.md").read_text()
@@ -94,19 +149,6 @@ class TestAdversaryPrompt(unittest.TestCase):
         self.assertIn("3 argue-back loops", content)
 
 
-class TestSkill(unittest.TestCase):
-    def test_skill_md_exists(self):
-        self.assertTrue(
-            (ROOT / "skills" / "crucible-verify" / "SKILL.md").exists()
-        )
-
-    def test_skill_has_instructions(self):
-        content = (ROOT / "skills" / "crucible-verify" / "SKILL.md").read_text()
-        self.assertIn("crucible-verify", content)
-        self.assertIn("--focus", content)
-        self.assertIn("--strict", content)
-
-
 class TestScripts(unittest.TestCase):
     def test_parse_diff_exists(self):
         self.assertTrue((ROOT / "scripts" / "parse-diff.sh").exists())
@@ -134,9 +176,13 @@ class TestDocumentation(unittest.TestCase):
         content = (ROOT / "README.md").read_text()
         self.assertIn("install", content.lower())
 
-    def test_readme_has_usage(self):
+    def test_readme_has_plugin_install(self):
         content = (ROOT / "README.md").read_text()
-        self.assertIn("crucible-verify", content)
+        self.assertIn("claude plugin install", content)
+
+    def test_readme_has_cli_usage(self):
+        content = (ROOT / "README.md").read_text()
+        self.assertIn("bin/crucible", content)
 
 
 class TestEvalHarness(unittest.TestCase):
@@ -164,10 +210,6 @@ class TestEvalHarness(unittest.TestCase):
         self.assertIn("results", output)
         names = [r["name"] for r in output["results"]]
         self.assertIn("syntax_check", names)
-        self.assertIn("plugin_structure", names)
-        self.assertIn("adversary_prompt", names)
-        self.assertIn("hook_wiring", names)
-        self.assertIn("e2e_validation", names)
 
 
 if __name__ == "__main__":

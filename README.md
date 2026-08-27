@@ -29,73 +29,36 @@ You start a Claude Code session with a task
 
 ## Install
 
-Copy or symlink the Crucible directory into your project, then add the hooks to your Claude Code settings.
+```bash
+claude plugin install /path/to/crucible
+```
 
-### Option 1: Copy the plugin
+This registers Crucible as a plugin. Hooks fire automatically on every session, the skill is available as `/crucible-verify`, and the adversary agent can be invoked directly with `@crucible:adversary`.
+
+To install for a specific scope:
 
 ```bash
-cp -r crucible/ your-project/.crucible-plugin/
+claude plugin install /path/to/crucible --scope project   # team-wide via version control
+claude plugin install /path/to/crucible --scope user       # personal (default)
 ```
 
-### Option 2: Add hooks manually
+### Enable / Disable
 
-Add the following to your project's `.claude/settings.json`:
-
-```json
-{
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "mkdir -p .crucible && echo \"$PROMPT\" > .crucible/task.md",
-            "timeout": 5000
-          },
-          {
-            "type": "command",
-            "command": "sleep 1 && claude -p \"You are the Crucible adversary agent (Phase 1 — Planning). Read agents/adversary.md for your full system prompt and behavioral rules. Read .crucible/task.md for the user's original task. Build a verification plan BEFORE seeing any code changes. Write your plan to .crucible/verification-plan.md.\" --max-turns 20",
-            "async": true,
-            "timeout": 120
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash scripts/parse-diff.sh",
-            "timeout": 30000
-          },
-          {
-            "type": "command",
-            "command": "bash scripts/parse-diff.sh && claude -p \"You are the Crucible adversary agent (Phase 2 — Execution). Read agents/adversary.md for your full system prompt and behavioral rules. Read .crucible/verification-plan.md for your Phase 1 plan. Read .crucible/diff.md for the code changes. Execute your verification plan against the actual changes. Run what was built. Classify findings by severity (Critical/Major/Minor). Write your report to .crucible/report.md.\" --max-turns 30; if grep -q 'CRUCIBLE_VERDICT: FAIL' .crucible/report.md 2>/dev/null; then echo 'Crucible: Critical/Major findings detected. Review .crucible/report.md' >&2; exit 2; fi",
-            "asyncRewake": true,
-            "timeout": 300
-          }
-        ]
-      }
-    ]
-  }
-}
+```bash
+claude plugin enable crucible
+claude plugin disable crucible
 ```
-
-### Option 3: Use the skill directly
-
-No hooks needed — just type `/crucible-verify` at any point during your session. The skill captures the current diff and runs verification immediately.
 
 ## Usage
 
 ### Automatic mode (hooks)
 
-With hooks installed, Crucible runs fully automatically:
-1. When you submit a prompt, the UserPromptSubmit hook captures your task and spawns the adversary for Phase 1 planning (runs concurrently in the background while you work).
-2. When Claude finishes responding, the Stop hook captures the diff and spawns the adversary for Phase 2 execution (runs in the background, wakes the session if Critical/Major findings are detected).
+With Crucible installed, verification runs fully automatically:
+1. When you submit a prompt, the UserPromptSubmit hook captures your task and spawns the adversary for Phase 1 planning (runs async while you work).
+2. When Claude finishes responding, the Stop hook captures the diff and spawns the adversary for Phase 2 execution (runs async, re-wakes the session with findings).
 3. The adversary's report is written to `.crucible/report.md`. If Critical or Major findings exist, they are delivered back to your session automatically via `asyncRewake`.
 
-### Manual mode (skill only)
+### Manual mode (skill)
 
 At any point during a session, type:
 
@@ -109,6 +72,23 @@ This skips Phase 1 planning and goes straight to Phase 2 execution against the c
 - `/crucible-verify --focus security` — narrow verification to security concerns
 - `/crucible-verify --focus performance` — focus on performance
 - `/crucible-verify --strict` — fail on any finding, including Minor
+
+### Direct agent invocation
+
+You can invoke the adversary agent directly:
+
+```
+@crucible:adversary verify this change for security issues
+```
+
+### CLI wrapper
+
+The `bin/crucible` script provides a standalone CLI:
+
+```bash
+bin/crucible 'verify the current changes'
+bin/crucible --max-loops 5 --project-dir /path/to/project 'check for security issues'
+```
 
 ### Reading the Report
 
@@ -150,7 +130,7 @@ The adversary is a Claude Code subprocess — it shares your session's cost budg
 
 ## Troubleshooting
 
-**Adversary not spawning:** Check that hooks are configured in `.claude/settings.json` (or via the plugin's `hooks/hooks.json`). The hooks must include both the data-capture commands and the `async`/`asyncRewake` commands that spawn `claude` subprocesses. Verify `claude` is on your PATH.
+**Adversary not spawning:** Verify Crucible is installed and enabled: `claude plugin list`. The hooks fire automatically when the plugin is active.
 
 **No diff captured:** `parse-diff.sh` requires a git repository with committed changes. If you're working in a new repo with no commits, make an initial commit first.
 
@@ -162,7 +142,8 @@ The adversary is a Claude Code subprocess — it shares your session's cost budg
 
 ```
 crucible/
-├── plugin.json                     # Plugin manifest
+├── .claude-plugin/
+│   └── plugin.json                 # Plugin manifest (required for detection)
 ├── hooks/
 │   └── hooks.json                  # Lifecycle hook definitions
 ├── agents/
@@ -171,7 +152,10 @@ crucible/
 │   └── crucible-verify/
 │       └── SKILL.md                # Manual /crucible-verify trigger
 ├── scripts/
+│   ├── capture-task.sh             # Task capture for UserPromptSubmit hook
 │   └── parse-diff.sh               # Diff parser for feeding adversary
+├── bin/
+│   └── crucible                    # Standalone CLI wrapper
 ├── eval/
 │   └── score.py                    # 5-dimension eval harness
 ├── tests/

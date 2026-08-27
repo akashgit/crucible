@@ -1,18 +1,21 @@
 {
+  "description": "Adversarial verification hooks — captures task on prompt, runs verification on stop",
   "hooks": {
     "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "mkdir -p .crucible && echo \"$PROMPT\" > .crucible/task.md && echo 'Crucible: task captured for adversarial verification'",
-            "timeout": 5000
+            "command": "bash",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/scripts/capture-task.sh"
+            ],
+            "timeout": 5
           },
           {
-            "type": "command",
-            "command": "sleep 1 && claude -p \"You are the Crucible adversary agent (Phase 1 — Planning). Read agents/adversary.md for your full system prompt and behavioral rules. Read .crucible/task.md for the user's original task. Build a verification plan BEFORE seeing any code changes. Write your plan to .crucible/verification-plan.md.\" --max-turns 20",
-            "async": true,
-            "timeout": 120
+            "type": "agent",
+            "prompt": "You are the Crucible adversary agent (Phase 1 — Planning). Read ${CLAUDE_PLUGIN_ROOT}/agents/adversary.md for your full system prompt and behavioral rules. Read .crucible/task.md for the user's original task. Build a verification plan BEFORE seeing any code changes. Write your plan to .crucible/verification-plan.md. Do NOT read any implementation files or diffs.",
+            "async": true
           }
         ]
       }
@@ -22,14 +25,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash scripts/parse-diff.sh && echo 'Crucible: diff captured for adversarial verification'",
-            "timeout": 30000
+            "command": "bash",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/scripts/parse-diff.sh"
+            ],
+            "timeout": 30
           },
           {
-            "type": "command",
-            "command": "bash scripts/parse-diff.sh && claude -p \"You are the Crucible adversary agent (Phase 2 — Execution). Read agents/adversary.md for your full system prompt and behavioral rules. Read .crucible/verification-plan.md for your Phase 1 plan. Read .crucible/diff.md for the code changes. Execute your verification plan against the actual changes. Run what was built. Classify findings by severity (Critical/Major/Minor). Write your report to .crucible/report.md.\" --max-turns 30; if grep -q 'CRUCIBLE_VERDICT: FAIL' .crucible/report.md 2>/dev/null; then echo 'Crucible: Critical/Major findings detected. Review .crucible/report.md' >&2; exit 2; fi",
+            "type": "agent",
+            "prompt": "You are the Crucible adversary agent (Phase 2 — Execution). Read ${CLAUDE_PLUGIN_ROOT}/agents/adversary.md for your full system prompt and behavioral rules. Read .crucible/verification-plan.md for your Phase 1 plan. Read .crucible/diff.md for the code changes. Execute your verification plan against the actual changes. Run what was built. Classify findings by severity (Critical/Major/Minor). Write your report to .crucible/report.md.",
             "asyncRewake": true,
-            "timeout": 300
+            "rewakeMessage": "Crucible verification complete — review .crucible/report.md for findings"
           }
         ]
       }
