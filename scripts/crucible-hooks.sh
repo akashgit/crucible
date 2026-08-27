@@ -23,24 +23,40 @@ phase1() {
     echo "$prompt" > "$CRUCIBLE_DIR/task.md"
     echo "Crucible: task captured for adversarial verification"
 
+    # Only spawn Phase 1 once per session
+    if [ -f "$CRUCIBLE_DIR/verification-plan.md" ] || [ -f "$CRUCIBLE_DIR/.phase1-running" ]; then
+        exit 0
+    fi
+    touch "$CRUCIBLE_DIR/.phase1-running"
+
     # Spawn Phase 1 adversary in background — plans verification before seeing code
-    claude -p \
-        --system-prompt "You are the Crucible adversary agent (Phase 1 — Planning). Read $PLUGIN_ROOT/agents/adversary.md for your full system prompt and behavioral rules. Follow the PHASE 1 instructions exactly. Read .crucible/task.md for the user's original task. Build a verification plan BEFORE seeing any code changes. Write your plan to .crucible/verification-plan.md. Do NOT read any implementation files or diffs." \
-        --allowedTools "Read" "Write" "Edit" "Bash(cat *)" "Bash(ls *)" "Bash(find *)" \
-        --max-budget-usd 0.50 \
-        --dangerously-skip-permissions \
-        "Read $PLUGIN_ROOT/agents/adversary.md then read .crucible/task.md. Follow Phase 1 instructions: build a verification plan and write it to .crucible/verification-plan.md." \
-        > /dev/null 2>&1 &
+    (
+        claude -p \
+            --system-prompt "You are the Crucible adversary agent (Phase 1 — Planning). Read $PLUGIN_ROOT/agents/adversary.md for your full system prompt and behavioral rules. Follow the PHASE 1 instructions exactly. Read .crucible/task.md for the user's original task. Build a verification plan BEFORE seeing any code changes. Write your plan to .crucible/verification-plan.md. Do NOT read any implementation files or diffs." \
+            --allowedTools "Read" "Write" "Edit" "Bash(cat *)" "Bash(ls *)" "Bash(find *)" \
+            --max-budget-usd 0.50 \
+            --dangerously-skip-permissions \
+            "Read $PLUGIN_ROOT/agents/adversary.md then read .crucible/task.md. Follow Phase 1 instructions: build a verification plan and write it to .crucible/verification-plan.md." \
+            > /dev/null 2>&1
+        rm -f "$CRUCIBLE_DIR/.phase1-running"
+    ) &
 
     echo "Crucible: Phase 1 adversary spawned (planning verification)"
 }
 
 phase2() {
+    # Only run Phase 2 once per stop event
+    if [ -f "$CRUCIBLE_DIR/.phase2-running" ]; then
+        exit 0
+    fi
+    touch "$CRUCIBLE_DIR/.phase2-running"
+
     # Capture the diff first
     bash "$PLUGIN_ROOT/scripts/parse-diff.sh"
 
     # Check if there's actually a diff to verify
     if [ ! -f "$CRUCIBLE_DIR/diff.md" ]; then
+        rm -f "$CRUCIBLE_DIR/.phase2-running"
         echo "Crucible: no diff found, skipping verification"
         exit 0
     fi
@@ -53,6 +69,8 @@ phase2() {
         --dangerously-skip-permissions \
         "Read $PLUGIN_ROOT/agents/adversary.md then read .crucible/diff.md and .crucible/verification-plan.md (if it exists). Follow Phase 2 instructions: execute verification, run what was built, write report to .crucible/report.md." \
         > /dev/null 2>&1
+
+    rm -f "$CRUCIBLE_DIR/.phase2-running"
 
     # Check the verdict — exit 2 to trigger asyncRewake if findings exist
     if [ -f "$CRUCIBLE_DIR/report.md" ]; then
