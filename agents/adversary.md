@@ -189,7 +189,11 @@ Write `.crucible/report.md` with this structure:
 
 ## Unplanned Observations
 [anything you noticed that wasn't in the original plan]
+
+<!-- CRUCIBLE_VERDICT: PASS -->
 ```
+
+**Important:** The last line of every report MUST be a machine-readable verdict comment — either `<!-- CRUCIBLE_VERDICT: PASS -->` or `<!-- CRUCIBLE_VERDICT: FAIL -->`. Set FAIL if any Critical or Major findings remain OPEN. Set PASS otherwise. This line is used by the stop hook to decide whether to rewake the session.
 
 ---
 

@@ -71,7 +71,7 @@ Add the following to your project's `.claude/settings.json`:
           },
           {
             "type": "command",
-            "command": "bash scripts/parse-diff.sh && claude -p \"You are the Crucible adversary agent (Phase 2 — Execution). Read agents/adversary.md for your full system prompt and behavioral rules. Read .crucible/verification-plan.md for your Phase 1 plan. Read .crucible/diff.md for the code changes. Execute your verification plan against the actual changes. Run what was built. Classify findings by severity (Critical/Major/Minor). Write your report to .crucible/report.md.\" --max-turns 30; if grep -qiE 'Critical|Major' .crucible/report.md 2>/dev/null; then echo 'Crucible: Critical/Major findings detected. Review .crucible/report.md' >&2; exit 2; fi",
+            "command": "bash scripts/parse-diff.sh && claude -p \"You are the Crucible adversary agent (Phase 2 — Execution). Read agents/adversary.md for your full system prompt and behavioral rules. Read .crucible/verification-plan.md for your Phase 1 plan. Read .crucible/diff.md for the code changes. Execute your verification plan against the actual changes. Run what was built. Classify findings by severity (Critical/Major/Minor). Write your report to .crucible/report.md.\" --max-turns 30; if grep -q 'CRUCIBLE_VERDICT: FAIL' .crucible/report.md 2>/dev/null; then echo 'Crucible: Critical/Major findings detected. Review .crucible/report.md' >&2; exit 2; fi",
             "asyncRewake": true,
             "timeout": 300
           }
@@ -156,7 +156,7 @@ The adversary is a Claude Code subprocess — it shares your session's cost budg
 
 **Large diffs causing timeouts:** Diffs over 50K characters are truncated. If your session makes very large changes, use `/crucible-verify --focus <area>` to narrow the scope.
 
-**"No changes detected":** The diff parser looks at `git diff HEAD` and `git diff --cached`. If all changes are committed, it falls back to `git diff HEAD~1 HEAD`.
+**"No changes detected":** The diff parser looks at `git diff HEAD` first (which includes both staged and unstaged changes). If HEAD doesn't exist (new repo), it falls back to `git diff --cached`. If all changes are committed, it falls back to `git diff HEAD~1 HEAD`.
 
 ## Architecture
 

@@ -10,18 +10,21 @@ MAX_CHARS=50000
 mkdir -p "$CRUCIBLE_DIR"
 
 diff_output=$(git diff HEAD 2>/dev/null || true)
-staged_output=$(git diff --cached 2>/dev/null || true)
 
-if [ -z "$diff_output" ] && [ -z "$staged_output" ]; then
+if [ -z "$diff_output" ]; then
+    diff_output=$(git diff --cached 2>/dev/null || true)
+fi
+
+if [ -z "$diff_output" ]; then
     diff_output=$(git diff HEAD~1 HEAD 2>/dev/null || true)
 fi
 
-if [ -z "$diff_output" ] && [ -z "$staged_output" ]; then
+if [ -z "$diff_output" ]; then
     echo "No changes detected."
     exit 0
 fi
 
-full_diff="${staged_output}${diff_output}"
+full_diff="$diff_output"
 
 files_added=$(echo "$full_diff" | grep -c '^+++ b/' 2>/dev/null || echo "0")
 files_summary=$(echo "$full_diff" | grep '^+++ b/' | sed 's|^+++ b/||' || true)
