@@ -51,6 +51,12 @@ Add the following to your project's `.claude/settings.json`:
             "type": "command",
             "command": "mkdir -p .crucible && echo \"$PROMPT\" > .crucible/task.md",
             "timeout": 5000
+          },
+          {
+            "type": "command",
+            "command": "sleep 1 && claude -p \"You are the Crucible adversary agent (Phase 1 — Planning). Read agents/adversary.md for your full system prompt and behavioral rules. Read .crucible/task.md for the user's original task. Build a verification plan BEFORE seeing any code changes. Write your plan to .crucible/verification-plan.md.\" --max-turns 20",
+            "async": true,
+            "timeout": 120
           }
         ]
       }
@@ -62,6 +68,12 @@ Add the following to your project's `.claude/settings.json`:
             "type": "command",
             "command": "bash scripts/parse-diff.sh",
             "timeout": 30000
+          },
+          {
+            "type": "command",
+            "command": "bash scripts/parse-diff.sh && claude -p \"You are the Crucible adversary agent (Phase 2 — Execution). Read agents/adversary.md for your full system prompt and behavioral rules. Read .crucible/verification-plan.md for your Phase 1 plan. Read .crucible/diff.md for the code changes. Execute your verification plan against the actual changes. Run what was built. Classify findings by severity (Critical/Major/Minor). Write your report to .crucible/report.md.\" --max-turns 30; if grep -qiE 'Critical|Major' .crucible/report.md 2>/dev/null; then echo 'Crucible: Critical/Major findings detected. Review .crucible/report.md' >&2; exit 2; fi",
+            "asyncRewake": true,
+            "timeout": 300
           }
         ]
       }
@@ -78,10 +90,10 @@ No hooks needed — just type `/crucible-verify` at any point during your sessio
 
 ### Automatic mode (hooks)
 
-With hooks installed, Crucible runs automatically:
-1. When you start a session, the UserPromptSubmit hook captures your task.
-2. When your session ends, the Stop hook captures the diff.
-3. Run `/crucible-verify` to trigger the adversary.
+With hooks installed, Crucible runs fully automatically:
+1. When you submit a prompt, the UserPromptSubmit hook captures your task and spawns the adversary for Phase 1 planning (runs concurrently in the background while you work).
+2. When Claude finishes responding, the Stop hook captures the diff and spawns the adversary for Phase 2 execution (runs in the background, wakes the session if Critical/Major findings are detected).
+3. The adversary's report is written to `.crucible/report.md`. If Critical or Major findings exist, they are delivered back to your session automatically via `asyncRewake`.
 
 ### Manual mode (skill only)
 
@@ -138,7 +150,7 @@ The adversary is a Claude Code subprocess — it shares your session's cost budg
 
 ## Troubleshooting
 
-**Adversary not spawning:** Check that hooks are configured in `.claude/settings.json`. The hooks must be in the correct format (see Install above).
+**Adversary not spawning:** Check that hooks are configured in `.claude/settings.json` (or via the plugin's `hooks/hooks.json`). The hooks must include both the data-capture commands and the `async`/`asyncRewake` commands that spawn `claude` subprocesses. Verify `claude` is on your PATH.
 
 **No diff captured:** `parse-diff.sh` requires a git repository with committed changes. If you're working in a new repo with no commits, make an initial commit first.
 
