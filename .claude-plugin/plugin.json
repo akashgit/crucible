@@ -1,0 +1,8 @@
+{
+  "name": "crucible",
+  "version": "1.0.0",
+  "description": "Adversarial verification for Claude Code. Spawns an independent verification agent that plans while you work, then verifies your changes with evidence.",
+  "author": {
+    "name": "Akash Srivastava"
+  }
+}
