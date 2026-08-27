@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mkdir -p .crucible && echo \"$PROMPT\" > .crucible/task.md && echo 'Crucible: task captured for adversarial verification'",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/parse-diff.sh && echo 'Crucible: diff captured. Run /crucible-verify to verify changes.'",
+            "timeout": 30000
+          }
+        ]
+      }
+    ]
+  }
+}
