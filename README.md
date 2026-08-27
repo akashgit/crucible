@@ -81,15 +81,6 @@ You can invoke the adversary agent directly:
 @crucible:adversary verify this change for security issues
 ```
 
-### CLI wrapper
-
-The `bin/crucible` script provides a standalone CLI:
-
-```bash
-bin/crucible 'verify the current changes'
-bin/crucible --max-loops 5 --project-dir /path/to/project 'check for security issues'
-```
-
 ### Reading the Report
 
 After verification, check `.crucible/report.md`:
@@ -136,7 +127,7 @@ The adversary is a Claude Code subprocess — it shares your session's cost budg
 
 **Large diffs causing timeouts:** Diffs over 50K characters are truncated. If your session makes very large changes, use `/crucible-verify --focus <area>` to narrow the scope.
 
-**"No changes detected":** The diff parser looks at `git diff HEAD` first (which includes both staged and unstaged changes). If HEAD doesn't exist (new repo), it falls back to `git diff --cached`. If all changes are committed, it falls back to `git diff HEAD~1 HEAD`.
+**"No changes detected":** The diff parser checks `git diff HEAD~1 HEAD` first (committed changes — the most common case after the primary agent commits). If no committed diff is found, it falls back to `git diff HEAD` (uncommitted), then `git diff --cached` (staged only).
 
 ## Architecture
 
@@ -152,10 +143,8 @@ crucible/
 │   └── crucible-verify/
 │       └── SKILL.md                # Manual /crucible-verify trigger
 ├── scripts/
-│   ├── capture-task.sh             # Task capture for UserPromptSubmit hook
+│   ├── crucible-hooks.sh           # Hook dispatcher (task capture + adversary spawning)
 │   └── parse-diff.sh               # Diff parser for feeding adversary
-├── bin/
-│   └── crucible                    # Standalone CLI wrapper
 ├── eval/
 │   └── score.py                    # 5-dimension eval harness
 ├── tests/

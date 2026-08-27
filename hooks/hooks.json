@@ -19,9 +19,13 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/crucible-hooks.sh\" phase2 \"${CLAUDE_PLUGIN_ROOT}\"",
             "timeout": 300,
-            "asyncRewake": true,
-            "rewakeMessage": "Crucible verification complete — review .crucible/report.md for findings",
-            "rewakeSummary": "Crucible adversary found issues"
+            "asyncRewake": true
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/crucible-hooks.sh\" phase2-wait \"${CLAUDE_PLUGIN_ROOT}\"",
+            "timeout": 300,
+            "statusMessage": "Crucible: verifying your changes..."
           }
         ]
       }

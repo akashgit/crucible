@@ -18,10 +18,8 @@ crucible/
 │   └── crucible-verify/
 │       └── SKILL.md                # Manual /crucible-verify trigger
 ├── scripts/
-│   ├── capture-task.sh             # Task capture for UserPromptSubmit hook
+│   ├── crucible-hooks.sh           # Hook dispatcher (task capture + adversary spawning)
 │   └── parse-diff.sh               # Diff parser for feeding adversary
-├── bin/
-│   └── crucible                    # Standalone CLI wrapper
 ├── eval/
 │   └── score.py                    # 5-dimension eval harness
 ├── tests/

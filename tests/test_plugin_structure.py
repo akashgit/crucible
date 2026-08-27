@@ -11,43 +11,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
-class TestCLI(unittest.TestCase):
-    def test_bin_crucible_exists(self):
-        self.assertTrue((ROOT / "bin" / "crucible").exists())
-
-    def test_bin_crucible_executable(self):
-        self.assertTrue(os.access(ROOT / "bin" / "crucible", os.X_OK))
-
-    def test_bin_crucible_valid_bash(self):
-        result = subprocess.run(
-            ["bash", "-n", str(ROOT / "bin" / "crucible")],
-            capture_output=True,
-            text=True,
-        )
-        self.assertEqual(result.returncode, 0, f"Syntax error: {result.stderr}")
-
-    def test_bin_crucible_help(self):
-        result = subprocess.run(
-            [str(ROOT / "bin" / "crucible"), "--help"],
-            capture_output=True,
-            text=True,
-        )
-        self.assertEqual(result.returncode, 0)
-        self.assertIn("Usage:", result.stdout)
-        self.assertIn("--max-loops", result.stdout)
-        self.assertIn("--project-dir", result.stdout)
-        self.assertIn("--verbose", result.stdout)
-
-    def test_bin_crucible_no_args_error(self):
-        result = subprocess.run(
-            [str(ROOT / "bin" / "crucible")],
-            capture_output=True,
-            text=True,
-        )
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("No task provided", result.stderr)
-
-
 class TestPluginManifest(unittest.TestCase):
     def test_plugin_json_exists(self):
         self.assertTrue((ROOT / ".claude-plugin" / "plugin.json").exists())
@@ -106,11 +69,10 @@ class TestHooksFormat(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, f"Syntax error: {result.stderr}")
 
-    def test_capture_task_script_exists(self):
-        self.assertTrue((ROOT / "scripts" / "capture-task.sh").exists())
-
-    def test_capture_task_executable(self):
-        self.assertTrue(os.access(ROOT / "scripts" / "capture-task.sh", os.X_OK))
+    def test_crucible_hooks_dispatches_phases(self):
+        content = (ROOT / "scripts" / "crucible-hooks.sh").read_text()
+        self.assertIn("phase1", content)
+        self.assertIn("phase2", content)
 
 
 class TestAdversaryPrompt(unittest.TestCase):
@@ -191,9 +153,9 @@ class TestDocumentation(unittest.TestCase):
         content = (ROOT / "README.md").read_text()
         self.assertIn("claude plugin install", content)
 
-    def test_readme_has_cli_usage(self):
+    def test_readme_has_manual_usage(self):
         content = (ROOT / "README.md").read_text()
-        self.assertIn("bin/crucible", content)
+        self.assertIn("/crucible-verify", content)
 
 
 class TestEvalHarness(unittest.TestCase):

@@ -36,7 +36,7 @@ def eval_syntax_check() -> dict:
         if result.returncode != 0:
             errors.append(f"{sh_file.name}: {result.stderr.strip()}")
 
-    for json_file in [ROOT / "plugin.json", ROOT / "hooks" / "hooks.json"]:
+    for json_file in [ROOT / ".claude-plugin" / "plugin.json", ROOT / "hooks" / "hooks.json"]:
         if json_file.exists():
             checks += 1
             try:
@@ -61,7 +61,7 @@ def eval_syntax_check() -> dict:
 def eval_plugin_structure() -> dict:
     """Check that required plugin files exist with expected content."""
     required = {
-        "plugin.json": lambda p: "crucible" in p.read_text(),
+        ".claude-plugin/plugin.json": lambda p: "crucible" in p.read_text(),
         "hooks/hooks.json": lambda p: "hooks" in p.read_text(),
         "agents/adversary.md": lambda p: len(p.read_text()) > 100,
         "skills/crucible-verify/SKILL.md": lambda p: len(p.read_text()) > 50,
@@ -180,7 +180,15 @@ def eval_hook_wiring() -> dict:
         for hook in entry.get("hooks", []):
             commands.append(hook.get("command", ""))
     combined = " ".join(commands)
-    checks["stop_references_parse_diff"] = "parse-diff.sh" in combined
+    references_parse_diff = "parse-diff.sh" in combined
+    if not references_parse_diff:
+        for cmd in commands:
+            if "crucible-hooks.sh" in cmd:
+                script_path = ROOT / "scripts" / "crucible-hooks.sh"
+                if script_path.exists() and "parse-diff.sh" in script_path.read_text():
+                    references_parse_diff = True
+                    break
+    checks["stop_references_parse_diff"] = references_parse_diff
 
     checks["parse_diff_exists"] = (ROOT / "scripts" / "parse-diff.sh").exists()
     checks["parse_diff_executable"] = os.access(ROOT / "scripts" / "parse-diff.sh", os.X_OK)

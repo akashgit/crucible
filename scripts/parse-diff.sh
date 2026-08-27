@@ -13,29 +13,40 @@ MAX_CHARS=50000
 mkdir -p "$CRUCIBLE_DIR"
 
 # Most common case: changes were just committed, so check committed diff first
-diff_output=$(git diff HEAD~1 HEAD 2>/dev/null || true)
+diff_output=$(git diff HEAD~1 HEAD -- ':!.crucible' 2>/dev/null || true)
 
 # Fall back to uncommitted changes (staged or unstaged)
 if [ -z "$diff_output" ]; then
-    diff_output=$(git diff HEAD 2>/dev/null || true)
+    diff_output=$(git diff HEAD -- ':!.crucible' 2>/dev/null || true)
 fi
 
 if [ -z "$diff_output" ]; then
-    diff_output=$(git diff --cached 2>/dev/null || true)
+    diff_output=$(git diff --cached -- ':!.crucible' 2>/dev/null || true)
+fi
+
+# Handle untracked files — git diff doesn't see them, so temporarily
+# mark them as intent-to-add and capture the diff
+if [ -z "$diff_output" ]; then
+    untracked=$(git ls-files --others --exclude-standard -- ':!.crucible' 2>/dev/null || true)
+    if [ -n "$untracked" ]; then
+        echo "$untracked" | xargs -I{} git add -N {} 2>/dev/null || true
+        diff_output=$(git diff -- ':!.crucible' 2>/dev/null || true)
+        git reset 2>/dev/null || true
+    fi
 fi
 
 if [ -z "$diff_output" ]; then
-    echo "No changes detected."
+    echo "Crucible: no changes detected"
     exit 0
 fi
 
 full_diff="$diff_output"
 
-files_added=$(echo "$full_diff" | grep -c '^+++ b/' 2>/dev/null || echo "0")
+files_added=$(echo "$full_diff" | grep -c '^+++ b/' 2>/dev/null || true)
 files_summary=$(echo "$full_diff" | grep '^+++ b/' | sed 's|^+++ b/||' || true)
 
-insertions=$(echo "$full_diff" | grep -c '^+[^+]' 2>/dev/null || echo "0")
-deletions=$(echo "$full_diff" | grep -c '^-[^-]' 2>/dev/null || echo "0")
+insertions=$(echo "$full_diff" | grep -c '^+[^+]' 2>/dev/null || true)
+deletions=$(echo "$full_diff" | grep -c '^-[^-]' 2>/dev/null || true)
 
 languages=""
 while IFS= read -r file; do
@@ -83,4 +94,4 @@ $truncated_diff
 \`\`\`
 DIFFEOF
 
-echo "Diff written to $CRUCIBLE_DIR/diff.md ($files_added files, +$insertions/-$deletions lines)"
+echo "Crucible: diff captured ($files_added files, +$insertions/-$deletions lines)"
