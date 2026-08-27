@@ -12,14 +12,16 @@ MAX_CHARS=50000
 
 mkdir -p "$CRUCIBLE_DIR"
 
-diff_output=$(git diff HEAD 2>/dev/null || true)
+# Most common case: changes were just committed, so check committed diff first
+diff_output=$(git diff HEAD~1 HEAD 2>/dev/null || true)
 
+# Fall back to uncommitted changes (staged or unstaged)
 if [ -z "$diff_output" ]; then
-    diff_output=$(git diff --cached 2>/dev/null || true)
+    diff_output=$(git diff HEAD 2>/dev/null || true)
 fi
 
 if [ -z "$diff_output" ]; then
-    diff_output=$(git diff HEAD~1 HEAD 2>/dev/null || true)
+    diff_output=$(git diff --cached 2>/dev/null || true)
 fi
 
 if [ -z "$diff_output" ]; then

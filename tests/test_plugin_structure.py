@@ -74,14 +74,13 @@ class TestHooksFormat(unittest.TestCase):
         data = json.loads((ROOT / "hooks" / "hooks.json").read_text())
         self.assertIn("hooks", data)
 
-    def test_hooks_use_exec_form(self):
+    def test_hooks_command_hooks_have_command_field(self):
         data = json.loads((ROOT / "hooks" / "hooks.json").read_text())
         for event, matcher_groups in data["hooks"].items():
             for group in matcher_groups:
                 for hook in group["hooks"]:
                     if hook["type"] == "command":
                         self.assertIn("command", hook)
-                        self.assertIn("args", hook)
 
     def test_hooks_use_plugin_root(self):
         content = (ROOT / "hooks" / "hooks.json").read_text()
@@ -90,10 +89,22 @@ class TestHooksFormat(unittest.TestCase):
     def test_hooks_stop_has_async_rewake(self):
         data = json.loads((ROOT / "hooks" / "hooks.json").read_text())
         stop_hooks = data["hooks"]["Stop"]
-        agent_hooks = [
-            h for g in stop_hooks for h in g["hooks"] if h["type"] == "agent"
-        ]
-        self.assertTrue(any(h.get("asyncRewake") for h in agent_hooks))
+        all_hooks = [h for g in stop_hooks for h in g["hooks"]]
+        self.assertTrue(any(h.get("asyncRewake") for h in all_hooks))
+
+    def test_crucible_hooks_script_exists(self):
+        self.assertTrue((ROOT / "scripts" / "crucible-hooks.sh").exists())
+
+    def test_crucible_hooks_executable(self):
+        self.assertTrue(os.access(ROOT / "scripts" / "crucible-hooks.sh", os.X_OK))
+
+    def test_crucible_hooks_valid_bash(self):
+        result = subprocess.run(
+            ["bash", "-n", str(ROOT / "scripts" / "crucible-hooks.sh")],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, f"Syntax error: {result.stderr}")
 
     def test_capture_task_script_exists(self):
         self.assertTrue((ROOT / "scripts" / "capture-task.sh").exists())

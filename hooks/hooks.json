@@ -6,16 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash",
-            "args": [
-              "${CLAUDE_PLUGIN_ROOT}/scripts/capture-task.sh"
-            ],
-            "timeout": 5
-          },
-          {
-            "type": "agent",
-            "prompt": "You are the Crucible adversary agent (Phase 1 — Planning). Read ${CLAUDE_PLUGIN_ROOT}/agents/adversary.md for your full system prompt and behavioral rules. Read .crucible/task.md for the user's original task. Build a verification plan BEFORE seeing any code changes. Write your plan to .crucible/verification-plan.md. Do NOT read any implementation files or diffs.",
-            "async": true
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/crucible-hooks.sh\" phase1 \"${CLAUDE_PLUGIN_ROOT}\"",
+            "timeout": 10
           }
         ]
       }
@@ -25,17 +17,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash",
-            "args": [
-              "${CLAUDE_PLUGIN_ROOT}/scripts/parse-diff.sh"
-            ],
-            "timeout": 30
-          },
-          {
-            "type": "agent",
-            "prompt": "You are the Crucible adversary agent (Phase 2 — Execution). Read ${CLAUDE_PLUGIN_ROOT}/agents/adversary.md for your full system prompt and behavioral rules. Read .crucible/verification-plan.md for your Phase 1 plan. Read .crucible/diff.md for the code changes. Execute your verification plan against the actual changes. Run what was built. Classify findings by severity (Critical/Major/Minor). Write your report to .crucible/report.md.",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/crucible-hooks.sh\" phase2 \"${CLAUDE_PLUGIN_ROOT}\"",
+            "timeout": 300,
             "asyncRewake": true,
-            "rewakeMessage": "Crucible verification complete — review .crucible/report.md for findings"
+            "rewakeMessage": "Crucible verification complete — review .crucible/report.md for findings",
+            "rewakeSummary": "Crucible adversary found issues"
           }
         ]
       }
