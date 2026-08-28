@@ -1,11 +1,13 @@
 # Crucible
 
-Adversarial verification plugin for Claude Code. Crucible spawns an independent agent that plans verification while you work, then executes that plan against your changes — running what was built, finding real problems with evidence, and looping with fixes until issues are resolved.
+Adversarial verification plugin for Claude Code. Add `@crucible` to any prompt and an independent agent plans verification while you work, then executes that plan against your changes — running what was built, finding real problems with evidence, and looping with fixes until issues are resolved.
+
+Crucible is **opt-in**: prompts without `@crucible` are completely ignored.
 
 ## How It Works
 
 ```
-You submit a prompt
+You submit a prompt containing @crucible
     |
     |--- Claude works on your task (normal session)
     |
@@ -30,6 +32,8 @@ You submit a prompt
                  Crucible re-verifies the fixes
                  Loops up to 3 times (configurable)
                  Stops on PASS or max iterations
+
+Prompts without @crucible → nothing happens, zero overhead.
 ```
 
 ## Install
@@ -38,7 +42,7 @@ You submit a prompt
 claude plugin install /path/to/crucible
 ```
 
-Hooks fire automatically on every session. The skill is available as `/crucible-verify`, and the adversary agent can be invoked directly with `@crucible:adversary`.
+Once installed, just add `@crucible` to any prompt to activate verification. The skill `/crucible-verify` and the adversary agent `@crucible:adversary` are also available for manual use.
 
 To install for a specific scope:
 
