@@ -77,19 +77,22 @@ claude plugin uninstall crucible
 
 ### Automatic mode (default)
 
-With Crucible installed and enabled, everything is automatic:
+Crucible only activates when your prompt contains `@crucible`:
 
-1. **You submit a prompt** — Crucible captures your task and spawns Phase 1 planning in the background.
+```
+Build a URL shortener with SQLite storage @crucible
+```
+
+1. **You submit a prompt with `@crucible`** — Crucible captures your task and spawns Phase 1 planning in the background. Prompts without the trigger are ignored.
 2. **Claude finishes** — the Stop hook captures the diff and runs Phase 2 verification. A spinner shows "Crucible: verifying your changes..." while it works.
 3. **Findings delivered** — the session rewakes with the Crucible report. Claude reads the findings and fixes any issues.
 4. **Re-verification** — Crucible re-verifies the fixes. This loops up to 3 times or until all findings are resolved.
 
 ### Configuration
 
-Set the max verify-fix iterations via environment variable:
-
 ```bash
 export CRUCIBLE_MAX_ITERATIONS=5   # default is 3
+export CRUCIBLE_TRIGGER="verify"   # default is @crucible
 ```
 
 ### Manual mode (skill)

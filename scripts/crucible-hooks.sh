@@ -7,6 +7,7 @@ PHASE="${1:-}"
 PLUGIN_ROOT="${2:-${CLAUDE_PLUGIN_ROOT:-.}}"
 CRUCIBLE_DIR=".crucible"
 MAX_ITERATIONS="${CRUCIBLE_MAX_ITERATIONS:-3}"
+TRIGGER="${CRUCIBLE_TRIGGER:-@crucible}"
 
 # Prevent recursive hook execution — Phase 1/2 claude -p subprocesses
 # are themselves Claude Code sessions that would re-trigger these hooks
@@ -30,6 +31,11 @@ phase1() {
     prompt=$(echo "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('prompt',''))" 2>/dev/null || echo "$input")
 
     if [ -z "$prompt" ]; then
+        exit 0
+    fi
+
+    # Only activate if prompt contains the trigger keyword
+    if ! echo "$prompt" | grep -qi "$TRIGGER"; then
         exit 0
     fi
 
@@ -58,6 +64,11 @@ phase1() {
 }
 
 phase2() {
+    # Skip if Crucible wasn't activated for this session
+    if [ ! -f "$CRUCIBLE_DIR/task.md" ]; then
+        exit 0
+    fi
+
     local iteration
     iteration=$(get_iteration)
 
@@ -136,6 +147,11 @@ phase2() {
 }
 
 phase2_wait() {
+    # Skip if Crucible wasn't activated for this session
+    if [ ! -f "$CRUCIBLE_DIR/task.md" ]; then
+        exit 0
+    fi
+
     # Synchronous companion to asyncRewake phase2 — shows spinner while Phase 2 runs
     local waited=0
     while [ ! -f "$CRUCIBLE_DIR/report.md" ] && [ "$waited" -lt 290 ]; do
